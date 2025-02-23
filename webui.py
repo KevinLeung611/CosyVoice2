@@ -14,12 +14,10 @@
 import os
 import random
 import sys
-import argparse
 import gradio as gr
 import librosa
 import numpy as np
 import torch
-import torchaudio
 
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.append('{}/third_party/Matcha-TTS'.format(ROOT_DIR))
@@ -64,10 +62,10 @@ def generate_audio(tts_text, mode_checkbox_group, prompt_text, prompt_wav_upload
                    seed = 0, stream = False, speed = 1):
     if prompt_wav_upload is not None:
         prompt_wav = prompt_wav_upload
-    # elif prompt_wav_record is not None:
-    #     prompt_wav = prompt_wav_record
     else:
         prompt_wav = None
+    # elif prompt_wav_record is not None:
+    #     prompt_wav = prompt_wav_record
 
     if mode_checkbox_group == '3s极速复刻':
         logging.info('get zero_shot inference request')
