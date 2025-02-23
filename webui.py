@@ -60,12 +60,12 @@ def change_instruction(mode_checkbox_group):
     return instruct_dict[mode_checkbox_group]
 
 
-def generate_audio(tts_text, mode_checkbox_group, prompt_text, prompt_wav_upload, prompt_wav_record = None, instruct_text = None,
+def generate_audio(tts_text, mode_checkbox_group, prompt_text, prompt_wav_upload, instruct_text = None,
                    seed = 0, stream = False, speed = 1):
     if prompt_wav_upload is not None:
         prompt_wav = prompt_wav_upload
-    elif prompt_wav_record is not None:
-        prompt_wav = prompt_wav_record
+    # elif prompt_wav_record is not None:
+    #     prompt_wav = prompt_wav_record
     else:
         prompt_wav = None
 
@@ -116,7 +116,7 @@ def main():
     # }
     """
     # theme = gr.Theme.from_hub('ParityError/Interstellar')
-    with gr.Blocks(css=css, theme=gr.themes.Soft()) as demo:
+    with gr.Blocks(css=css, theme=gr.themes.Soft(), title="CosyVoice2") as demo:
         gr.Markdown("### 代码库 [CosyVoice](https://github.com/FunAudioLLM/CosyVoice) \
                     预训练模型 [CosyVoice2-0.5B](https://www.modelscope.cn/models/iic/CosyVoice2-0.5B)")
         gr.Markdown("#### 请输入需要合成的文本，选择推理模式，并按照提示步骤进行操作")
@@ -141,10 +141,10 @@ def main():
             instruction_text = gr.Text(label="操作步骤", value=instruct_dict[inference_mode_list[0]])
 
         with gr.Row():
-            prompt_wav_upload = gr.Audio(sources='upload', type='filepath', label='选择prompt音频文件，注意采样率不低于16khz')
+            prompt_wav_upload = gr.Audio(sources=['upload', 'microphone'], type='filepath', label='上传音频文件，注意采样率不低于16khz')
 
-        with gr.Row():
-            prompt_wav_record = gr.Audio(sources='microphone', type='filepath', label='录制prompt音频文件')
+        # with gr.Row():
+        #     prompt_wav_record = gr.Audio(sources='microphone', type='filepath', label='录制prompt音频文件')
 
         prompt_text = gr.Textbox(label="输入prompt文本", lines=1, placeholder="请输入prompt文本，需与prompt音频内容一致，暂时不支持自动识别...", value='')
         instruct_text = gr.Textbox(label="输入instruct文本", lines=1, placeholder="请输入instruct文本.", value='')
@@ -155,7 +155,7 @@ def main():
 
         seed_button.click(generate_seed, inputs=[], outputs=seed)
         generate_button.click(generate_audio,
-                              inputs=[tts_text, mode_checkbox_group, prompt_text, prompt_wav_upload, prompt_wav_record,
+                              inputs=[tts_text, mode_checkbox_group, prompt_text, prompt_wav_upload,
                                       instruct_text, seed, stream, speed],
                               outputs=[audio_output])
         mode_checkbox_group.change(fn=change_instruction, inputs=[mode_checkbox_group], outputs=[instruction_text])
