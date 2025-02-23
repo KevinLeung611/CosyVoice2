@@ -16,7 +16,7 @@
 ![Demo](asset/demo.png)
 
 ## 使用方法
-可以参考 CosyVoice 的[官方文档](https://github.com/FunAudioLLM/CosyVoice)
+开箱即用，可以参考 CosyVoice 的[官方文档](https://github.com/FunAudioLLM/CosyVoice)
 本仓库提供了下载模型的脚本(init.py)，不用自己创建了，因为只支持 CosyVoice2，因此只需要下载这个模型就可以了(可以节省很多磁盘空间)
 
 ```shell
