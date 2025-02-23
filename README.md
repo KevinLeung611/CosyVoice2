@@ -17,14 +17,14 @@
 
 ## 使用方法
 开箱即用，可以参考 CosyVoice 的[官方文档](https://github.com/FunAudioLLM/CosyVoice)，
-本仓库提供了下载模型的脚本(init.py)，不用自己创建了，因为只支持 CosyVoice2，因此只需要下载这个模型就可以了(可以节省很多磁盘空间)
+本仓库提供了下载模型的脚本(init.py)，不用自己创建了，因为只支持 CosyVoice2，因此只需要下载这个模型就可以了(可以节省很多磁盘空间)。
 
 ```shell
 # Download the CosyVoice2 model
 python init.py
 ```
 
-下载好模型之后，使用官方提供的 webui.py 脚本启动，这里不需要指定端口和模型，端口默认使用Gradio设置的7860
+下载好模型之后，使用官方提供的 webui.py 脚本启动，这里不需要指定端口和模型，端口默认使用Gradio设置的7860。
 
 ```shell
 # Launch the server
