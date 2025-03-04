@@ -27,9 +27,9 @@ from cosyvoice.utils.common import set_all_random_seed
 
 inference_mode_list = ['3s极速复刻', '跨语种复刻', '自然语言控制']
 instruct_dict = {'预训练音色': '1. 选择预训练音色\n2. 点击生成音频按钮',
-                 '3s极速复刻': '1. 选择prompt音频文件，或录入prompt音频，注意不超过30s，若同时提供，优先选择prompt音频文件\n2. 输入prompt文本\n3. 点击生成音频按钮',
-                 '跨语种复刻': '1. 选择prompt音频文件，或录入prompt音频，注意不超过30s，若同时提供，优先选择prompt音频文件\n2. 点击生成音频按钮',
-                 '自然语言控制': '1. 选择预训练音色\n2. 输入instruct文本\n3. 点击生成音频按钮'}
+                 '3s极速复刻': '简单音色复刻:\n1. 选择prompt音频文件，或录入prompt音频，注意不超过30s，若同时提供，优先选择prompt音频文件\n2. 输入prompt文本\n3. 点击生成音频按钮',
+                 '跨语种复刻': '支持语气指令复刻音色:\n1. 选择prompt音频文件，或录入prompt音频，注意不超过30s，若同时提供，优先选择prompt音频文件\n2. 点击生成音频按钮',
+                 '自然语言控制': '支持方言复刻音色:\n1. 选择prompt音频文件，或录入prompt音频，注意不超过30s，若同时提供，优先选择prompt音频文件\n2. 输入instruct文本\n3. 点击生成音频按钮'}
 stream_mode_list = [('否', False), ('是', True)]
 max_val = 0.8
 
