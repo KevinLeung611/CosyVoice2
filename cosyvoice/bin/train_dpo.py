@@ -27,8 +27,8 @@ from hyperpyyaml import load_hyperpyyaml
 
 from torch.distributed.elastic.multiprocessing.errors import record
 
-from cosyvoice.utils.executor import Executor
-from cosyvoice.utils.train_utils import (
+from cosyvoice.utils.executor_dpo import Executor
+from cosyvoice.utils.train_utils_dpo import (
     init_distributed,
     init_dataset_and_dataloader,
     init_optimizer_and_scheduler,
@@ -46,7 +46,6 @@ def get_args():
     parser.add_argument('--config', required=True, help='config file')
     parser.add_argument('--train_data', required=True, help='train data file')
     parser.add_argument('--cv_data', required=True, help='cv data file')
-    parser.add_argument('--qwen_pretrain_path', required=False, help='qwen pretrain path')
     parser.add_argument('--checkpoint', help='checkpoint model')
     parser.add_argument('--model_dir', required=True, help='save model dir')
     parser.add_argument('--tensorboard_dir',
@@ -82,6 +81,14 @@ def get_args():
                         default=60,
                         type=int,
                         help='timeout (in seconds) of cosyvoice_join.')
+    parser.add_argument('--dpo',
+                        action='store_true',
+                        default=False,
+                        help='Use Direct Preference Optimization')
+    parser.add_argument('--beta',
+                        default=0.01,
+                        type=float,
+                        help='beta of dpo training')
     parser = deepspeed.add_config_arguments(parser)
     args = parser.parse_args()
     return args
@@ -98,12 +105,8 @@ def main():
     override_dict = {k: None for k in ['llm', 'flow', 'hift', 'hifigan'] if k != args.model}
     if gan is True:
         override_dict.pop('hift')
-    try:
-        with open(args.config, 'r') as f:
-            configs = load_hyperpyyaml(f, overrides={**override_dict, 'qwen_pretrain_path': args.qwen_pretrain_path})
-    except Exception:
-        with open(args.config, 'r') as f:
-            configs = load_hyperpyyaml(f, overrides=override_dict)
+    with open(args.config, 'r') as f:
+        configs = load_hyperpyyaml(f, overrides=override_dict)
     if gan is True:
         configs['train_conf'] = configs['train_conf_gan']
     configs['train_conf'].update(vars(args))
@@ -123,11 +126,16 @@ def main():
 
     # load checkpoint
     model = configs[args.model]
+    ref_model = None
+    if args.dpo:
+        ref_model = deepcopy(model)
     start_step, start_epoch = 0, -1
     if args.checkpoint is not None:
         if os.path.exists(args.checkpoint):
             state_dict = torch.load(args.checkpoint, map_location='cpu')
             model.load_state_dict(state_dict, strict=False)
+            if args.dpo:
+                ref_model.load_state_dict(state_dict, strict=False)
             if 'step' in state_dict:
                 start_step = state_dict['step']
             if 'epoch' in state_dict:
@@ -137,9 +145,13 @@ def main():
 
     # Dispatch model from cpu to gpu
     model = wrap_cuda_model(args, model)
+    if args.dpo:
+        ref_model = wrap_cuda_model(args, ref_model)
 
     # Get optimizer & scheduler
     model, optimizer, scheduler, optimizer_d, scheduler_d = init_optimizer_and_scheduler(args, configs, model, gan)
+    if args.dpo:
+        ref_model, _, _, _, _ = init_optimizer_and_scheduler(args, configs, ref_model, gan)
     scheduler.set_step(start_step)
     if scheduler_d is not None:
         scheduler_d.set_step(start_step)
@@ -151,7 +163,7 @@ def main():
     save_model(model, 'init', info_dict)
 
     # Get executor
-    executor = Executor(gan=gan)
+    executor = Executor(gan=gan, dpo=args.dpo, beta=args.beta)
     executor.step = start_step
 
     # Init scaler, used for pytorch amp mixed precision training
@@ -167,7 +179,7 @@ def main():
             executor.train_one_epoc_gan(model, optimizer, scheduler, optimizer_d, scheduler_d, train_data_loader, cv_data_loader,
                                         writer, info_dict, scaler, group_join)
         else:
-            executor.train_one_epoc(model, optimizer, scheduler, train_data_loader, cv_data_loader, writer, info_dict, scaler, group_join)
+            executor.train_one_epoc(model, optimizer, scheduler, train_data_loader, cv_data_loader, writer, info_dict, scaler, group_join, ref_model)
         dist.destroy_process_group(group_join)
 
 

@@ -159,7 +159,6 @@ def truncate(data, truncate_length=24576, mode='train'):
 
 def compute_fbank(data,
                   feat_extractor,
-                  token_mel_ratio=0,
                   mode='train'):
     """ Extract fbank
 
@@ -175,13 +174,8 @@ def compute_fbank(data,
         assert 'utt' in sample
         assert 'text_token' in sample
         waveform = sample['speech']
-        feat = feat_extractor(waveform).squeeze(dim=0).transpose(0, 1)
-        if token_mel_ratio != 0:
-            # trim to align speech_token and speech_feat
-            token_len = int(min(feat.shape[0] / token_mel_ratio, sample["speech_token"].shape[0]))
-            feat = feat[:token_mel_ratio * token_len]
-            sample["speech_token"] = sample["speech_token"][:token_len]
-        sample['speech_feat'] = feat
+        mat = feat_extractor(waveform).squeeze(dim=0).transpose(0, 1)
+        sample['speech_feat'] = mat
         yield sample
 
 
@@ -202,8 +196,8 @@ def compute_f0(data, sample_rate, hop_size, mode='train'):
         assert 'text_token' in sample
         waveform = sample['speech']
         _f0, t = pw.harvest(waveform.squeeze(dim=0).numpy().astype('double'), sample_rate, frame_period=frame_period)
-        if sum(_f0 != 0) < 5:  # this happens when the algorithm fails
-            _f0, t = pw.dio(waveform.squeeze(dim=0).numpy().astype('double'), sample_rate, frame_period=frame_period)  # if harvest fails, try dio
+        if sum(_f0 != 0) < 5: # this happens when the algorithm fails
+            _f0, t = pw.dio(waveform.squeeze(dim=0).numpy().astype('double'), sample_rate, frame_period=frame_period) # if harvest fails, try dio
         f0 = pw.stonemask(waveform.squeeze(dim=0).numpy().astype('double'), _f0, t, sample_rate)
         f0 = F.interpolate(torch.from_numpy(f0).view(1, 1, -1), size=sample['speech_feat'].shape[0], mode='linear').view(-1)
         sample['pitch_feat'] = f0
@@ -362,7 +356,7 @@ def batch(data, batch_type='static', batch_size=16, max_frames_in_batch=12000, m
             logging.fatal('Unsupported batch type {}'.format(batch_type))
 
 
-def padding(data, use_spk_embedding, mode='train', gan=False):
+def padding(data, use_spk_embedding, mode='train', gan=False, dpo=False):
     """ Padding the data into training data
 
         Args:
@@ -411,6 +405,14 @@ def padding(data, use_spk_embedding, mode='train', gan=False):
             "utt_embedding": utt_embedding,
             "spk_embedding": spk_embedding,
         }
+        if dpo:
+            reject_speech_token = [torch.tensor(sample[i]['reject_speech_token']) for i in order]
+            reject_speech_token_len = torch.tensor([i.size(0) for i in reject_speech_token], dtype=torch.int32)
+            reject_speech_token = pad_sequence(reject_speech_token,
+                                                batch_first=True,
+                                                padding_value=0)
+            batch['reject_speech_token'] = reject_speech_token
+            batch['reject_speech_token_len'] = reject_speech_token_len
         if gan is True:
             # in gan train, we need pitch_feat
             pitch_feat = [sample[i]['pitch_feat'] for i in order]

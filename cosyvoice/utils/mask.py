@@ -15,7 +15,6 @@
 # limitations under the License.
 
 import torch
-from cosyvoice.utils.file_utils import logging
 '''
 def subsequent_mask(
         size: int,
@@ -153,7 +152,6 @@ def subsequent_chunk_mask(
          [1, 1, 1, 1]]
     """
     # NOTE this modified implementation meets onnx export requirements, but it doesn't support num_left_chunks
-    # actually this is not needed after we have inference cache implemented, will remove it later
     pos_idx = torch.arange(size, device=device)
     block_value = (torch.div(pos_idx, chunk_size, rounding_mode='trunc') + 1) * chunk_size
     ret = pos_idx.unsqueeze(0) < block_value.unsqueeze(1)
@@ -233,8 +231,8 @@ def add_optional_chunk_mask(xs: torch.Tensor,
         chunk_masks = masks
     assert chunk_masks.dtype == torch.bool
     if (chunk_masks.sum(dim=-1) == 0).sum().item() != 0:
-        logging.warning('get chunk_masks all false at some timestep, force set to true, make sure they are masked in futuer computation!')
-        chunk_masks[chunk_masks.sum(dim=-1)==0] = True
+        print('get chunk_masks all false at some timestep, force set to true, make sure they are masked in futuer computation!')
+        chunk_masks[chunk_masks.sum(dim=-1) == 0] = True
     return chunk_masks
 
 

@@ -1,5 +1,6 @@
 # Copyright (c) 2021 Mobvoi Inc. (authors: Binbin Zhang)
 #               2024 Alibaba Inc (authors: Xiang Lyu, Zetao Hu)
+#               2025 Alibaba Inc (authors: Xiang Lyu, Yabin Li)
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,7 +14,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 import json
+import torch
 import torchaudio
 import logging
 logging.getLogger('matplotlib').setLevel(logging.WARNING)
@@ -47,13 +50,8 @@ def load_wav(wav, target_sr):
     return speech
 
 
-def convert_onnx_to_trt(trt_model, onnx_model, fp16):
+def convert_onnx_to_trt(trt_model, trt_kwargs, onnx_model, fp16):
     import tensorrt as trt
-    _min_shape = [(2, 80, 4), (2, 1, 4), (2, 80, 4), (2,), (2, 80), (2, 80, 4)]
-    _opt_shape = [(2, 80, 193), (2, 1, 193), (2, 80, 193), (2,), (2, 80), (2, 80, 193)]
-    _max_shape = [(2, 80, 6800), (2, 1, 6800), (2, 80, 6800), (2,), (2, 80), (2, 80, 6800)]
-    input_names = ["x", "mask", "mu", "t", "spks", "cond"]
-
     logging.info("Converting onnx to trt...")
     network_flags = 1 << int(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH)
     logger = trt.Logger(trt.Logger.INFO)
@@ -61,7 +59,7 @@ def convert_onnx_to_trt(trt_model, onnx_model, fp16):
     network = builder.create_network(network_flags)
     parser = trt.OnnxParser(network, logger)
     config = builder.create_builder_config()
-    config.set_memory_pool_limit(trt.MemoryPoolType.WORKSPACE, 1 << 33)  # 8GB
+    config.set_memory_pool_limit(trt.MemoryPoolType.WORKSPACE, 1 << 32)  # 4GB
     if fp16:
         config.set_flag(trt.BuilderFlag.FP16)
     profile = builder.create_optimization_profile()
@@ -72,8 +70,8 @@ def convert_onnx_to_trt(trt_model, onnx_model, fp16):
                 print(parser.get_error(error))
             raise ValueError('failed to parse {}'.format(onnx_model))
     # set input shapes
-    for i in range(len(input_names)):
-        profile.set_shape(input_names[i], _min_shape[i], _opt_shape[i], _max_shape[i])
+    for i in range(len(trt_kwargs['input_names'])):
+        profile.set_shape(trt_kwargs['input_names'][i], trt_kwargs['min_shape'][i], trt_kwargs['opt_shape'][i], trt_kwargs['max_shape'][i])
     tensor_dtype = trt.DataType.HALF if fp16 else trt.DataType.FLOAT
     # set input and output data type
     for i in range(network.num_inputs):
@@ -87,3 +85,45 @@ def convert_onnx_to_trt(trt_model, onnx_model, fp16):
     # save trt engine
     with open(trt_model, "wb") as f:
         f.write(engine_bytes)
+    logging.info("Succesfully convert onnx to trt...")
+
+
+def export_cosyvoice2_vllm(model, model_path, device):
+    if os.path.exists(model_path):
+        return
+    pad_to = DEFAULT_VOCAB_PADDING_SIZE = 64
+    vocab_size = model.speech_embedding.num_embeddings
+    feature_size = model.speech_embedding.embedding_dim
+    pad_vocab_size = ((vocab_size + pad_to - 1) // pad_to) * pad_to
+
+    dtype = torch.bfloat16
+    # lm_head
+    new_lm_head = torch.nn.Linear(in_features=feature_size, out_features=pad_vocab_size, bias=True)
+    with torch.no_grad():
+        new_lm_head.weight[:vocab_size] = model.llm_decoder.weight
+        new_lm_head.bias[:vocab_size] = model.llm_decoder.bias
+        new_lm_head.weight[vocab_size:] = 0
+        new_lm_head.bias[vocab_size:] = 0
+    model.llm.model.lm_head = new_lm_head
+    new_codec_embed = torch.nn.Linear(in_features=feature_size, out_features=pad_vocab_size)
+    # embed_tokens
+    embed_tokens = model.llm.model.model.embed_tokens
+    with torch.no_grad():
+        new_codec_embed.weight[:vocab_size] = model.speech_embedding.weight
+        new_codec_embed.weight[vocab_size:] = 0
+    model.llm.model.set_input_embeddings(new_codec_embed)
+    model.llm.model.to(device)
+    model.llm.model.to(dtype)
+    tmp_vocab_size = model.llm.model.config.vocab_size
+    tmp_tie_embedding = model.llm.model.config.tie_word_embeddings
+    del model.llm.model.generation_config.eos_token_id
+    del model.llm.model.config.bos_token_id
+    del model.llm.model.config.eos_token_id
+    model.llm.model.config.vocab_size = pad_vocab_size
+    model.llm.model.config.tie_word_embeddings = False
+    model.llm.model.config.use_bias = True
+    model.llm.model.save_pretrained(model_path)
+    os.system('sed -i s@Qwen2ForCausalLM@CosyVoice2ForCausalLM@g {}/config.json'.format(os.path.abspath(model_path)))
+    model.llm.model.config.vocab_size = tmp_vocab_size
+    model.llm.model.config.tie_word_embeddings = tmp_tie_embedding
+    model.llm.model.set_input_embeddings(embed_tokens)

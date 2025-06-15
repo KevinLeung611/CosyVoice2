@@ -21,32 +21,32 @@
 
 下面是官方提供的初始化流程: 
 
-**Clone and install**
+### Clone and install
 
 - Clone the repo
-``` sh
-git clone --recursive https://github.com/KevinLeung611/CosyVoice2.git
-# If you failed to clone submodule due to network failures, please run following command until success
-cd CosyVoice2
-git submodule update --init --recursive
-```
+    ``` sh
+    git clone --recursive https://github.com/KevinLeung611/CosyVoice2.git
+    # If you failed to clone the submodule due to network failures, please run the following command until success
+    cd CosyVoice2
+    git submodule update --init --recursive
+    ```
 
 - Install Conda: please see https://docs.conda.io/en/latest/miniconda.html
 - Create Conda env:
 
-``` sh
-conda create -n cosyvoice -y python=3.10
-conda activate cosyvoice
-# pynini is required by WeTextProcessing, use conda to install it as it can be executed on all platform.
-conda install -y -c conda-forge pynini==2.1.5
-pip install -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple/ --trusted-host=mirrors.aliyun.com
-
-# If you encounter sox compatibility issues
-# ubuntu
-sudo apt-get install sox libsox-dev
-# centos
-sudo yum install sox sox-devel
-```
+    ``` sh
+    conda create -n cosyvoice -y python=3.10
+    conda activate cosyvoice
+    # pynini is required by WeTextProcessing, use conda to install it as it can be executed on all platforms.
+    conda install -y -c conda-forge pynini==2.1.5
+    pip install -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple/ --trusted-host=mirrors.aliyun.com
+    
+    # If you encounter sox compatibility issues
+    # ubuntu
+    sudo apt-get install sox libsox-dev
+    # centos
+    sudo yum install sox sox-devel
+    ```
 
 Optionally, you can unzip `ttsfrd` resouce and install `ttsfrd` package for better text normalization performance.
 

@@ -28,6 +28,7 @@ ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.append('{}/../..'.format(ROOT_DIR))
 sys.path.append('{}/../../third_party/Matcha-TTS'.format(ROOT_DIR))
 from cosyvoice.cli.cosyvoice import CosyVoice, CosyVoice2
+from cosyvoice.utils.file_utils import logging
 
 
 def get_dummy_input(batch_size, seq_len, out_channels, device):
@@ -51,6 +52,7 @@ def get_args():
     return args
 
 
+@torch.no_grad()
 def main():
     args = get_args()
     logging.basicConfig(level=logging.DEBUG,
@@ -66,6 +68,7 @@ def main():
 
     # 1. export flow decoder estimator
     estimator = model.model.flow.decoder.estimator
+    estimator.eval()
 
     device = model.model.device
     batch_size, seq_len = 2, 256
@@ -110,6 +113,7 @@ def main():
         }
         output_onnx = estimator_onnx.run(None, ort_inputs)[0]
         torch.testing.assert_allclose(output_pytorch, torch.from_numpy(output_onnx).to(device), rtol=1e-2, atol=1e-4)
+    logging.info('successfully export estimator')
 
 
 if __name__ == "__main__":
